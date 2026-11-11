@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Cpu, Layers, Pin, Eye, AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { ContextBreakdown, Campaign } from '../types/dnd';
+import { ContextBreakdown, Campaign } from './dnd';
 
 interface ContextInspectorModalProps {
   isOpen: boolean;

@@ -13,8 +13,8 @@ import {
   Shield,
   Layers,
 } from 'lucide-react';
-import { Campaign, RuleEdition, Character, LoreEntity, ChatMessage } from '../types/dnd';
-import { GALLERY_ASSETS } from '../data/galleryAssets';
+import { Campaign, RuleEdition, Character, LoreEntity, ChatMessage } from './dnd';
+import { GALLERY_ASSETS } from './galleryAssets';
 import { ImagePickerModal } from './ImagePickerModal';
 
 interface CampaignManagerModalProps {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Plus, Search, Tag, Sparkles, Trash2, Edit3, Check, MapPin, Users, Sword, ShieldAlert, Compass } from 'lucide-react';
-import { LoreEntity, EntityType, ActivationMode } from '../types/dnd';
+import { LoreEntity, EntityType, ActivationMode } from './dnd';
 
 interface LorebookModalProps {
   isOpen: boolean;

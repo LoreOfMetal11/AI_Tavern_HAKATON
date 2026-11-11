@@ -17,8 +17,8 @@ import {
   Flame,
   Info,
 } from 'lucide-react';
-import { Character, StatName, CheckRequest, ActiveCondition, ConditionType } from '../types/dnd';
-import { DND_SKILLS, formatModifier, getModifier, DND_CONDITIONS_CATALOG } from '../utils/rules';
+import { Character, StatName, CheckRequest, ActiveCondition, ConditionType } from './dnd';
+import { DND_SKILLS, formatModifier, getModifier, DND_CONDITIONS_CATALOG } from './rules';
 import { ImagePickerModal } from './ImagePickerModal';
 
 interface CharacterSheetModalProps {

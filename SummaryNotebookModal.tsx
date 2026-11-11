@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, BookOpen, Plus, Trash2, Edit2, Check, Sparkles, Sliders } from 'lucide-react';
-import { Campaign, CampaignHistoryEntry, ModelSettings } from '../types/dnd';
+import { Campaign, CampaignHistoryEntry, ModelSettings } from './dnd';
 
 interface SummaryNotebookModalProps {
   isOpen: boolean;

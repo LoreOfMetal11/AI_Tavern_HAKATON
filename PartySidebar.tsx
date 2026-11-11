@@ -1,8 +1,8 @@
 import React from 'react';
 import { Shield, Heart, MapPin, Compass, Plus, Dice6, Users, BookOpen, Sparkles, FolderKanban, Activity, AlertCircle } from 'lucide-react';
-import { Campaign, Character, LoreEntity, DmMood } from '../types/dnd';
-import { DM_MOOD_CONFIG } from '../data/galleryAssets';
-import { DND_CONDITIONS_CATALOG } from '../utils/rules';
+import { Campaign, Character, LoreEntity, DmMood } from './dnd';
+import { DM_MOOD_CONFIG } from './galleryAssets';
+import { DND_CONDITIONS_CATALOG } from './rules';
 
 interface PartySidebarProps {
   campaigns: Campaign[];

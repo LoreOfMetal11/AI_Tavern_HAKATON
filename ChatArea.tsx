@@ -15,8 +15,8 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { ChatMessage, Character, CheckRequest, PendingActionCheck } from '../types/dnd';
-import { DM_MOOD_CONFIG } from '../data/galleryAssets';
+import { ChatMessage, Character, CheckRequest, PendingActionCheck } from './dnd';
+import { DM_MOOD_CONFIG } from './galleryAssets';
 
 interface ChatAreaProps {
   messages: ChatMessage[];

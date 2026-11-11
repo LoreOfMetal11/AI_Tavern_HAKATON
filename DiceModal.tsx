@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
-import { CheckRequest, Character, StatName } from '../types/dnd';
-import { rollDie, formatModifier, getModifier, playSoundEffect, DND_SKILLS } from '../utils/rules';
+import { CheckRequest, Character, StatName } from './dnd';
+import { rollDie, formatModifier, getModifier, playSoundEffect, DND_SKILLS } from './rules';
 
 interface DiceModalProps {
   isOpen: boolean;

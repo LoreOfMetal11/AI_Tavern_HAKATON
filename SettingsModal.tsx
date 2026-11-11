@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Sliders, Server, Cpu, Sparkles, Shield, Download, Upload, Check, AlertCircle, RefreshCw } from 'lucide-react';
-import { ModelSettings, LLMProvider, RuleEdition, Campaign } from '../types/dnd';
+import { ModelSettings, LLMProvider, RuleEdition, Campaign } from './dnd';
 
 interface SettingsModalProps {
   isOpen: boolean;
