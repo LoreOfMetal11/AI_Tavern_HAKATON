@@ -8,7 +8,7 @@ import {
   retrieveRelevantLoreEntities,
   DND_CONDITIONS_CATALOG,
 } from './rules.ts';
-import { LoreEntity } from '../types/dnd.ts';
+import { LoreEntity } from './dnd.ts';
 
 describe('D&D 5e Core Rules & Math', () => {
   it('correctly calculates ability modifiers for standard ability scores', () => {
