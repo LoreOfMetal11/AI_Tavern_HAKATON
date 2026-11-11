@@ -1,7 +1,7 @@
 import React from 'react';
 import { Dice6, BookOpen, User, Sparkles, Sliders, Database, History, Compass } from 'lucide-react';
-import { ModelSettings, Campaign, DmMood } from '../types/dnd';
-import { DM_MOOD_CONFIG } from '../data/galleryAssets';
+import { ModelSettings, Campaign, DmMood } from './dnd';
+import { DM_MOOD_CONFIG } from './galleryAssets';
 
 interface HeaderProps {
   campaign: Campaign;

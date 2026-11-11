@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Check, Image as ImageIcon, Link as LinkIcon, Sparkles } from 'lucide-react';
-import { GALLERY_ASSETS, GalleryAsset } from '../data/galleryAssets';
+import { GALLERY_ASSETS, GalleryAsset } from './galleryAssets';
 
 interface ImagePickerModalProps {
   isOpen: boolean;

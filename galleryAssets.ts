@@ -1,4 +1,4 @@
-import { DmMood } from '../types/dnd';
+import { DmMood } from './dnd';
 
 export interface GalleryAsset {
   id: string;
@@ -15,35 +15,35 @@ export const GALLERY_ASSETS: GalleryAsset[] = [
     category: 'character',
     title: 'Лесной следопыт (Эльф)',
     description: 'Ловкий разведчик в зеленом капюшоне с композитным луком',
-    url: '/src/assets/images/hero_elf_ranger_1793967564845.jpg',
+    url: new URL('./hero_elf_ranger_1793967564845.jpg', import.meta.url).href,
   },
   {
     id: 'art-char-dwarf',
     category: 'character',
     title: 'Паладин наковальни (Дворф)',
     description: 'Закаленный рыцарь в рунных латах с боевым молотом',
-    url: '/src/assets/images/hero_dwarf_paladin_1793967564468.jpg',
+    url: new URL('./hero_dwarf_paladin_1793967564468.jpg', import.meta.url).href,
   },
   {
     id: 'art-char-mage',
     category: 'character',
     title: 'Чародейка арканных тайн',
     description: 'Магичка в расшитой звездами бархатной мантии с фиолетовыми рунами',
-    url: '/src/assets/images/avatar_mage_sorceress_1793979257712.jpg',
+    url: new URL('./avatar_mage_sorceress_1793979257712.jpg', import.meta.url).href,
   },
   {
     id: 'art-char-rogue',
     category: 'character',
     title: 'Теневой плут / Ассасин',
     description: 'Опасный вор в кожаном капюшоне с парными кинжалами',
-    url: '/src/assets/images/avatar_rogue_assassin_1793979260604.jpg',
+    url: new URL('./avatar_rogue_assassin_1793979260604.jpg', import.meta.url).href,
   },
   {
     id: 'art-char-dm',
     category: 'character',
     title: 'Мастер Подземелий (Dungeon Master)',
     description: 'Загадочный сказитель со звездным капюшоном и золотым d20',
-    url: '/src/assets/images/avatar_dm_master_mystic_1793979259583.jpg',
+    url: new URL('./avatar_dm_master_mystic_1793979259583.jpg', import.meta.url).href,
   },
 
   // Covers / Locations
@@ -52,28 +52,28 @@ export const GALLERY_ASSETS: GalleryAsset[] = [
     category: 'cover',
     title: 'Цитадель Штормов',
     description: 'Величественные гранитные врата замка с факелами и горным туманом',
-    url: '/src/assets/images/dnd_campaign_cover_1793967562693.jpg',
+    url: new URL('./dnd_campaign_cover_1793967562693.jpg', import.meta.url).href,
   },
   {
     id: 'art-cover-tavern',
     category: 'cover',
     title: 'Таверна «Пьяный Дракон»',
     description: 'Уютный средневековый трактир с камином, картами и кружками эля',
-    url: '/src/assets/images/dnd_tavern_interior_1793967564891.jpg',
+    url: new URL('./dnd_tavern_interior_1793967564891.jpg', import.meta.url).href,
   },
   {
     id: 'art-cover-crypt',
     category: 'cover',
     title: 'Гробница Короля-Лича',
     description: 'Зловещие катакомбы с каменными саркофагами и изумрудным пламенем',
-    url: '/src/assets/images/dnd_crypt_dungeon_cover_1793979259913.jpg',
+    url: new URL('./dnd_crypt_dungeon_cover_1793979259913.jpg', import.meta.url).href,
   },
   {
     id: 'art-cover-feywild',
     category: 'cover',
     title: 'Шепчущий Лес Фей (Feywild)',
     description: 'Волшебный сумеречный лес со светящимися грибами и древними рунами',
-    url: '/src/assets/images/dnd_feywild_forest_cover_1793979260394.jpg',
+    url: new URL('./dnd_feywild_forest_cover_1793979260394.jpg', import.meta.url).href,
   },
 ];
 
