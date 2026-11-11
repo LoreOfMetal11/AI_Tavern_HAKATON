@@ -1,0 +1,32 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Repair backups and local artifacts
+imports-backup-*/
+.import-repair-backup/
+.tavern-backup-*/
+.tavern-repair-*.json
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
