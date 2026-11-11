@@ -1,113 +1,58 @@
-import React, { useState, useEffect } from 'react';
-import {
-  INITIAL_CAMPAIGNS,
-  INITIAL_CHARACTERS,
-  INITIAL_LORE_ENTITIES,
-  INITIAL_MESSAGES,
-  DEFAULT_MODEL_SETTINGS,
-} from './data/defaultCampaigns';
-import {
-  Campaign,
-  Character,
-  LoreEntity,
-  ChatMessage,
-  ModelSettings,
-  CheckRequest,
-  CampaignHistoryEntry,
-  DmMood,
-  PendingActionCheck,
-} from './types/dnd';
-import { generateDmTurn, inspectContextWindow } from './services/llmService';
-import { assessActionForCheck } from './utils/rules';
-import { Header } from './components/Header';
-import { PartySidebar } from './components/PartySidebar';
-import { ChatArea } from './components/ChatArea';
-import { DiceModal } from './components/DiceModal';
-import { CharacterSheetModal } from './components/CharacterSheetModal';
-import { LorebookModal } from './components/LorebookModal';
-import { ContextInspectorModal } from './components/ContextInspectorModal';
-import { SummaryNotebookModal } from './components/SummaryNotebookModal';
-import { SettingsModal } from './components/SettingsModal';
-import { CampaignManagerModal } from './components/CampaignManagerModal';
+import React, { useState, useEffect, useRef } from 'react';
+import { INITIAL_CAMPAIGNS, INITIAL_CHARACTERS, INITIAL_LORE_ENTITIES, INITIAL_MESSAGES, DEFAULT_MODEL_SETTINGS } from './defaultCampaigns';
+import { Campaign, Character, LoreEntity, ChatMessage, ModelSettings, CheckRequest, CampaignHistoryEntry, DmMood, PendingActionCheck } from './dnd';
+import { generateDmTurn, inspectContextWindow } from './llmService';
+import { assessActionForCheck } from './rules';
+import { Header } from './Header';
+import { PartySidebar } from './PartySidebar';
+import { ChatArea } from './ChatArea';
+import { DiceModal } from './DiceModal';
+import { CharacterSheetModal } from './CharacterSheetModal';
+import { LorebookModal } from './LorebookModal';
+import { ContextInspectorModal } from './ContextInspectorModal';
+import { SummaryNotebookModal } from './SummaryNotebookModal';
+import { SettingsModal } from './SettingsModal';
+import { CampaignManagerModal } from './CampaignManagerModal';
+
+type TurnSlot = 'A' | 'B' | 'C' | 'D' | 'SIMULTANEOUS';
+
+function readSaved<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) ?? fallback : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readDefaultList<T extends { id: string }>(key: string, defaults: T[]): T[] {
+  const parsed = readSaved<T[]>(key, defaults);
+  if (!Array.isArray(parsed) || parsed.length === 0) return defaults;
+  const ids = new Set(parsed.map((item) => item.id));
+  return [...parsed, ...defaults.filter((item) => !ids.has(item.id))];
+}
 
 export default function App() {
-  // State with LocalStorage Persistence & Default Merging
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
-    const saved = localStorage.getItem('mythictavern_campaigns');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((c: any) => c.id));
-          const missingDefaults = INITIAL_CAMPAIGNS.filter((c) => !existingIds.has(c.id));
-          return [
-            ...parsed.map((c: any) => ({ ...c, dmMood: c.dmMood || 'neutral' })),
-            ...missingDefaults,
-          ];
-        }
-      } catch (e) {
-        console.error('Failed to parse saved campaigns:', e);
-      }
-    }
-    return INITIAL_CAMPAIGNS;
-  });
-
-  const [activeCampaignId, setActiveCampaignId] = useState<string>(() => {
-    return campaigns[0]?.id || 'camp-1';
-  });
-
-  const [characters, setCharacters] = useState<Character[]>(() => {
-    const saved = localStorage.getItem('mythictavern_characters');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((c: any) => c.id));
-          const missingDefaults = INITIAL_CHARACTERS.filter((c) => !existingIds.has(c.id));
-          return [...parsed, ...missingDefaults];
-        }
-      } catch (e) {}
-    }
-    return INITIAL_CHARACTERS;
-  });
-
-  const [loreEntities, setLoreEntities] = useState<LoreEntity[]>(() => {
-    const saved = localStorage.getItem('mythictavern_lore');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((e: any) => e.id));
-          const missingDefaults = INITIAL_LORE_ENTITIES.filter((e) => !existingIds.has(e.id));
-          return [...parsed, ...missingDefaults];
-        }
-      } catch (e) {}
-    }
-    return INITIAL_LORE_ENTITIES;
-  });
-
-  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
-    const saved = localStorage.getItem('mythictavern_messages');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        return { ...INITIAL_MESSAGES, ...parsed };
-      } catch (e) {}
-    }
-    return INITIAL_MESSAGES;
-  });
-
-  const [settings, setSettings] = useState<ModelSettings>(() => {
-    const saved = localStorage.getItem('mythictavern_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_MODEL_SETTINGS;
-  });
-
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() =>
+    readDefaultList('mythictavern_campaigns', INITIAL_CAMPAIGNS).map((c) => ({ ...c, dmMood: c.dmMood || 'neutral' }))
+  );
+  const [activeCampaignId, setActiveCampaignId] = useState(() => campaigns[0]?.id || 'camp-1');
+  const [characters, setCharacters] = useState<Character[]>(() => readDefaultList('mythictavern_characters', INITIAL_CHARACTERS));
+  const [loreEntities, setLoreEntities] = useState<LoreEntity[]>(() => readDefaultList('mythictavern_lore', INITIAL_LORE_ENTITIES));
+  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => ({
+    ...INITIAL_MESSAGES, ...readSaved<Record<string, ChatMessage[]>>('mythictavern_messages', {}),
+  }));
+  const [settings, setSettings] = useState<ModelSettings>(() => ({
+    ...DEFAULT_MODEL_SETTINGS, ...readSaved<Partial<ModelSettings>>('mythictavern_settings', {}),
+  }));
   const [activeSlot, setActiveSlot] = useState<'A' | 'B' | 'SIMULTANEOUS'>('A');
   const [activeCheck, setActiveCheck] = useState<CheckRequest | null>(null);
   const [pendingActionCheck, setPendingActionCheck] = useState<PendingActionCheck | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Modals state
+  const [turnError, setTurnError] = useState<string | null>(null);
+  const turnInFlight = useRef(false);
+  const visibleCampaign = useRef(activeCampaignId);
+  visibleCampaign.current = activeCampaignId;
   const [isDiceOpen, setIsDiceOpen] = useState(false);
   const [isCharSheetOpen, setIsCharSheetOpen] = useState(false);
   const [isLorebookOpen, setIsLorebookOpen] = useState(false);
@@ -116,470 +61,195 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCampaignManagerOpen, setIsCampaignManagerOpen] = useState(false);
 
-  // Sync to localStorage
+  useEffect(() => { localStorage.setItem('mythictavern_campaigns', JSON.stringify(campaigns)); }, [campaigns]);
+  useEffect(() => { localStorage.setItem('mythictavern_characters', JSON.stringify(characters)); }, [characters]);
+  useEffect(() => { localStorage.setItem('mythictavern_lore', JSON.stringify(loreEntities)); }, [loreEntities]);
+  useEffect(() => { localStorage.setItem('mythictavern_messages', JSON.stringify(messagesMap)); }, [messagesMap]);
+  useEffect(() => { localStorage.setItem('mythictavern_settings', JSON.stringify(settings)); }, [settings]);
   useEffect(() => {
-    localStorage.setItem('mythictavern_campaigns', JSON.stringify(campaigns));
-  }, [campaigns]);
+    setPendingActionCheck(null);
+    setActiveCheck(null);
+    setIsDiceOpen(false);
+    setTurnError(null);
+  }, [activeCampaignId]);
 
-  useEffect(() => {
-    localStorage.setItem('mythictavern_characters', JSON.stringify(characters));
-  }, [characters]);
-
-  useEffect(() => {
-    localStorage.setItem('mythictavern_lore', JSON.stringify(loreEntities));
-  }, [loreEntities]);
-
-  useEffect(() => {
-    localStorage.setItem('mythictavern_messages', JSON.stringify(messagesMap));
-  }, [messagesMap]);
-
-  useEffect(() => {
-    localStorage.setItem('mythictavern_settings', JSON.stringify(settings));
-  }, [settings]);
-
-  const DEFAULT_FALLBACK_HERO: Character = {
-    id: 'temp-hero',
-    name: 'Безымянный герой',
-    title: 'Искатель приключений',
-    isPlayer: true,
-    playerSlot: 'A',
-    race: 'Человек',
-    class: 'Воин',
-    subclass: 'Защитник',
-    level: 1,
-    hpCurrent: 10,
-    hpMax: 10,
-    ac: 10,
-    speed: 30,
-    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
-    profBonus: 2,
-    skills: {},
+  const fallbackHero: Character = {
+    id: 'temp-hero', name: 'Безымянный герой', title: 'Искатель приключений', isPlayer: true, playerSlot: 'A',
+    race: 'Человек', class: 'Воин', subclass: 'Защитник', level: 1, hpCurrent: 10, hpMax: 10, ac: 10, speed: 30,
+    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, profBonus: 2, skills: {},
     savingThrows: { STR: true, DEX: false, CON: true, INT: false, WIS: false, CHA: false },
-    avatar: '/src/assets/images/avatar_valeria_paladin_1793967563124.jpg',
-    inventory: [],
-    gold: 10,
-    alignment: 'Нейтральный',
-    backstory: 'Начинающий искатель приключений.',
-    personalityTraits: 'Решительный и осторожный.',
-    notes: '',
+    avatar: '/src/assets/images/avatar_valeria_paladin_1793967563124.jpg', inventory: [], gold: 10,
+    alignment: 'Нейтральный', backstory: 'Начинающий искатель приключений.', personalityTraits: 'Решительный и осторожный.', notes: '',
   };
-
-  const currentCampaign =
-    campaigns.find((c) => c.id === activeCampaignId) || campaigns[0];
+  const currentCampaign = campaigns.find((c) => c.id === activeCampaignId) || campaigns[0];
   const currentMessages = messagesMap[activeCampaignId] || [];
-  const currentLore = loreEntities.filter(
-    (e) => e.campaignId === activeCampaignId
-  );
-  const campaignCharacters = characters.filter((c) =>
-    currentCampaign.isCleanSession
-      ? c.campaignId === activeCampaignId
-      : (!c.campaignId || c.campaignId === activeCampaignId)
-  );
-  const currentCharacters = campaignCharacters;
-  const activeChar =
-    currentCharacters.find((c) => c.playerSlot === (activeSlot === 'SIMULTANEOUS' ? 'A' : activeSlot)) ||
-    currentCharacters[0] ||
-    DEFAULT_FALLBACK_HERO;
+  const currentLore = loreEntities.filter((e) => e.campaignId === activeCampaignId);
+  const currentCharacters = characters.filter((c) => currentCampaign.isCleanSession
+    ? c.campaignId === activeCampaignId : (!c.campaignId || c.campaignId === activeCampaignId));
+  const activeChar = currentCharacters.find((c) => c.playerSlot === (activeSlot === 'SIMULTANEOUS' ? 'A' : activeSlot)) || currentCharacters[0] || fallbackHero;
+  const contextBreakdown = inspectContextWindow(currentCampaign, currentCharacters, currentLore, currentMessages, settings);
+  const handleChangeDmMood = (mood: DmMood) => setCampaigns((prev) => prev.map((c) => c.id === activeCampaignId ? { ...c, dmMood: mood } : c));
 
-  const handleChangeDmMood = (mood: DmMood) => {
-    setCampaigns((prev) =>
-      prev.map((c) => (c.id === activeCampaignId ? { ...c, dmMood: mood } : c))
-    );
-  };
-
-  const handleCreateCampaign = (
-    newCamp: Campaign,
-    starterChars?: Character[],
-    starterLore?: LoreEntity[],
-    starterMsg?: ChatMessage
-  ) => {
+  const handleCreateCampaign = (newCamp: Campaign, starterChars?: Character[], starterLore?: LoreEntity[], starterMsg?: ChatMessage) => {
     setCampaigns((prev) => [newCamp, ...prev]);
     setActiveCampaignId(newCamp.id);
-    if (starterLore && starterLore.length > 0) {
-      setLoreEntities((prev) => [...starterLore, ...prev]);
-    }
-    if (starterChars && starterChars.length > 0) {
-      setCharacters((prev) => [...starterChars, ...prev]);
-    }
-    if (starterMsg) {
-      setMessagesMap((prev) => ({ ...prev, [newCamp.id]: [starterMsg] }));
-    }
+    if (starterChars?.length) setCharacters((prev) => [...starterChars, ...prev]);
+    if (starterLore?.length) setLoreEntities((prev) => [...starterLore, ...prev]);
+    if (starterMsg) setMessagesMap((prev) => ({ ...prev, [newCamp.id]: [starterMsg] }));
   };
-
   const handleDeleteCampaign = (id: string) => {
-    if (campaigns.length <= 1) return;
+    if (turnInFlight.current || campaigns.length <= 1) return;
     const remaining = campaigns.filter((c) => c.id !== id);
     setCampaigns(remaining);
-    if (activeCampaignId === id) {
-      setActiveCampaignId(remaining[0].id);
-    }
+    if (activeCampaignId === id) setActiveCampaignId(remaining[0].id);
     setLoreEntities((prev) => prev.filter((e) => e.campaignId !== id));
     setCharacters((prev) => prev.filter((c) => c.campaignId !== id));
   };
 
-  const handleCreateCharacter = (newChar: Character) => {
-    const scopedChar = { ...newChar, campaignId: activeCampaignId };
-    setCharacters((prev) => [...prev, scopedChar]);
-  };
-
-  const handleDeleteCharacter = (id: string) => {
-    setCharacters((prev) => prev.filter((c) => c.id !== id));
-  };
-
-  // Token breakdown for context inspector
-  const contextBreakdown = inspectContextWindow(
-    currentCampaign,
-    currentCharacters,
-    currentLore,
-    currentMessages,
-    settings
-  );
-
-  // Internal Turn Execution Pipeline
-  const executeDmTurn = async (
-    text: string,
-    speakerSlot: 'A' | 'B' = 'A'
-  ) => {
-    const speakerChar =
-      currentCharacters.find((c) => c.playerSlot === speakerSlot) || activeChar;
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      campaignId: activeCampaignId,
-      role: 'user',
-      speakerName: activeSlot === 'SIMULTANEOUS' ? 'Группа игроков' : speakerChar.name,
-      speakerPlayerSlot: activeSlot === 'SIMULTANEOUS' ? undefined : speakerSlot,
-      content: text,
-      timestamp: Date.now(),
-    };
-
-    const newMessages = [...currentMessages, userMsg];
-    setMessagesMap((prev) => ({
-      ...prev,
-      [activeCampaignId]: newMessages,
-    }));
-
+  // One synchronous lock covers sending, editing, dice results and regeneration.
+  const requestTurn = async (history: ChatMessage[], slot: TurnSlot, showUserImmediately: boolean) => {
+    if (turnInFlight.current) return;
+    const lastUser = history[history.length - 1];
+    if (!lastUser || lastUser.role !== 'user' || !lastUser.content.trim()) return;
+    turnInFlight.current = true;
+    const campaignId = activeCampaignId;
     setIsLoading(true);
-
+    setTurnError(null);
+    if (showUserImmediately) setMessagesMap((prev) => ({ ...prev, [campaignId]: history }));
     try {
+      // llmService appends userMessage itself: pass only the preceding history.
       const response = await generateDmTurn(
-        currentCampaign,
-        currentCharacters,
-        currentLore,
-        newMessages,
-        settings,
-        text
+        currentCampaign, currentCharacters.length ? currentCharacters : [fallbackHero], currentLore,
+        history.slice(0, -1), settings, lastUser.content, slot
       );
-
-      // Handle Auto-mutation of lore entities if suggested by AI
-      if (response.entityUpdates && response.entityUpdates.length > 0) {
-        setLoreEntities((prev) =>
-          prev.map((entity) => {
-            const update = response.entityUpdates?.find(
-              (u) =>
-                u.id.toLowerCase() === entity.id.toLowerCase() ||
-                u.id.toLowerCase() === entity.name.toLowerCase()
-            );
-            if (update && entity.isAutoMutable) {
-              return {
-                ...entity,
-                lastUpdatedNotes: `${update.notes} (Ход #${newMessages.length})`,
-              };
-            }
-            return entity;
-          })
-        );
+      if (!response.cleanContent.trim()) throw new Error('Модель вернула пустой ответ.');
+      if (response.entityUpdates?.length) {
+        setLoreEntities((prev) => prev.map((entity) => {
+          if (entity.campaignId !== campaignId || !entity.isAutoMutable) return entity;
+          const update = response.entityUpdates?.find((u) => u.id.toLowerCase() === entity.id.toLowerCase() || u.id.toLowerCase() === entity.name.toLowerCase());
+          return update ? { ...entity, lastUpdatedNotes: `${update.notes} (Ход #${history.length})` } : entity;
+        }));
       }
-
       const dmMsg: ChatMessage = {
-        id: `msg-dm-${Date.now()}`,
-        campaignId: activeCampaignId,
-        role: 'assistant',
-        speakerName: 'Dungeon Master',
-        speakerPlayerSlot: 'DM',
-        dmMood: currentCampaign.dmMood,
-        content: response.cleanContent,
-        reasoning: response.reasoning,
-        requestedCheck: response.requestedCheck,
-        timestamp: Date.now(),
+        id: `msg-dm-${crypto.randomUUID()}`, campaignId, role: 'assistant', speakerName: 'Dungeon Master', speakerPlayerSlot: 'DM',
+        dmMood: response.dmMood || currentCampaign.dmMood, content: response.cleanContent, reasoning: response.reasoning,
+        requestedCheck: response.requestedCheck, timestamp: Date.now(),
       };
-
-      setMessagesMap((prev) => ({
-        ...prev,
-        [activeCampaignId]: [...newMessages, dmMsg],
-      }));
-
-      // If AI still requested an emergency ability check (rare encounter twist):
-      if (response.requestedCheck) {
+      setMessagesMap((prev) => ({ ...prev, [campaignId]: [...history, dmMsg] }));
+      if (response.dmMood) setCampaigns((prev) => prev.map((c) => c.id === campaignId ? { ...c, dmMood: response.dmMood! } : c));
+      if (visibleCampaign.current === campaignId && response.requestedCheck) {
         setActiveCheck(response.requestedCheck);
         setIsDiceOpen(true);
       }
     } catch (error) {
       console.error('Failed to generate turn:', error);
+      if (visibleCampaign.current === campaignId) setTurnError(error instanceof Error ? error.message : 'Не удалось получить ответ модели.');
     } finally {
+      turnInFlight.current = false;
       setIsLoading(false);
     }
   };
 
-  // Two-Phase Pre-Check Action Evaluator:
-  // Decides whether an action strictly requires a roll BEFORE generating prose!
-  const handleSendMessage = async (
-    text: string,
-    speakerSlot: 'A' | 'B' = 'A'
-  ) => {
-    // If the input already contains a resolved dice roll or explicit narrative resolution:
-    const isAlreadyRollResult =
-      text.includes('[БРОСОК КУБИКА:') ||
-      text.includes('Результат проверки:') ||
-      text.includes('[Результат броска') ||
-      text.includes('[Игрок решает отыграть действие без броска');
-
-    if (!isAlreadyRollResult) {
-      const speakerChar =
-        currentCharacters.find((c) => c.playerSlot === speakerSlot) || activeChar;
-
-      const assessment = assessActionForCheck(
-        text,
-        speakerChar,
-        currentCampaign
-      );
-
+  const executeDmTurn = async (text: string, speakerSlot: 'A' | 'B' = 'A') => {
+    if (turnInFlight.current || !text.trim()) return;
+    const speaker = currentCharacters.find((c) => c.playerSlot === speakerSlot) || activeChar;
+    const slot: TurnSlot = activeSlot === 'SIMULTANEOUS' ? 'SIMULTANEOUS' : speakerSlot;
+    const userMsg: ChatMessage = {
+      id: `msg-${crypto.randomUUID()}`, campaignId: activeCampaignId, role: 'user',
+      speakerName: slot === 'SIMULTANEOUS' ? 'Группа игроков' : speaker.name,
+      speakerPlayerSlot: slot === 'SIMULTANEOUS' ? undefined : speakerSlot, content: text.trim(), timestamp: Date.now(),
+    };
+    await requestTurn([...currentMessages, userMsg], slot, true);
+  };
+  const handleSendMessage = async (text: string, speakerSlot: 'A' | 'B' = 'A') => {
+    if (turnInFlight.current || pendingActionCheck || !text.trim()) return;
+    const resolved = text.includes('[БРОСОК КУБИКА:') || text.includes('Результат проверки:') || text.includes('[Результат броска') || text.includes('[Игрок решает отыграть действие');
+    if (!resolved) {
+      const speaker = currentCharacters.find((c) => c.playerSlot === speakerSlot) || activeChar;
+      const assessment = assessActionForCheck(text, speaker, currentCampaign);
       if (assessment.requiresCheck) {
-        setPendingActionCheck({
-          actionText: text,
-          speakerSlot,
-          characterName: activeSlot === 'SIMULTANEOUS' ? 'Группа игроков' : speakerChar.name,
-          assessment,
-        });
-        return; // Halt turn generation until dice roll is decided!
+        setPendingActionCheck({ actionText: text, speakerSlot, characterName: activeSlot === 'SIMULTANEOUS' ? 'Группа игроков' : speaker.name, assessment });
+        return;
       }
     }
-
-    // Direct action without risk -> generate narrative immediately
     await executeDmTurn(text, speakerSlot);
   };
-
-  // Pending Check Roll Trigger
   const handleRollPendingCheck = () => {
-    if (!pendingActionCheck) return;
-    const chk: CheckRequest = {
-      stat: pendingActionCheck.assessment.stat || 'DEX',
-      skillName: pendingActionCheck.assessment.skillName,
-      dc: pendingActionCheck.assessment.dc || 13,
-      description: pendingActionCheck.assessment.description || 'Проверка характеристики',
-      sourceSpeaker: pendingActionCheck.characterName,
-    };
-    setActiveCheck(chk);
+    if (turnInFlight.current || !pendingActionCheck) return;
+    setActiveCheck({ stat: pendingActionCheck.assessment.stat || 'DEX', skillName: pendingActionCheck.assessment.skillName,
+      dc: pendingActionCheck.assessment.dc || 13, description: pendingActionCheck.assessment.description || 'Проверка характеристики', sourceSpeaker: pendingActionCheck.characterName });
     setIsDiceOpen(true);
   };
-
-  // Skip pending check narratively
   const handleSkipPendingCheck = () => {
-    if (!pendingActionCheck) return;
-    const combined = `${pendingActionCheck.actionText}\n\n[Игрок решает отыграть действие нарративно, без броска кости]`;
-    const slot = pendingActionCheck.speakerSlot;
+    if (turnInFlight.current || !pendingActionCheck) return;
+    const pending = pendingActionCheck;
     setPendingActionCheck(null);
-    executeDmTurn(combined, slot);
+    void executeDmTurn(`${pending.actionText}\n\n[Игрок решает отыграть действие нарративно, без броска кости]`, pending.speakerSlot);
   };
-
-  // Cancel pending check
-  const handleCancelPendingCheck = () => {
-    setPendingActionCheck(null);
-  };
-
-  // Dice roll applied back to chat (with pending action merging)
-  const handleApplyDiceResult = (resultText: string, checkData?: CheckRequest) => {
+  const handleApplyDiceResult = (resultText: string, _checkData?: CheckRequest) => {
+    if (turnInFlight.current) return;
     setActiveCheck(null);
-    if (pendingActionCheck) {
-      const combined = `${pendingActionCheck.actionText}\n\n${resultText}`;
-      const slot = pendingActionCheck.speakerSlot;
-      setPendingActionCheck(null);
-      executeDmTurn(combined, slot);
-    } else {
-      executeDmTurn(resultText, activeSlot === 'SIMULTANEOUS' ? 'A' : activeSlot);
-    }
+    setIsDiceOpen(false);
+    const pending = pendingActionCheck;
+    setPendingActionCheck(null);
+    void executeDmTurn(pending ? `${pending.actionText}\n\n${resultText}` : resultText, pending?.speakerSlot || (activeSlot === 'SIMULTANEOUS' ? 'A' : activeSlot));
   };
-
-  // Manual roll request from character sheet or chat card
   const handleTriggerSkillRoll = (check: CheckRequest) => {
+    if (turnInFlight.current) return;
     setActiveCheck(check);
     setIsDiceOpen(true);
   };
-
-  // Message edits
+  const messageSlot = (message: ChatMessage): TurnSlot => {
+    const slot = message.speakerPlayerSlot;
+    return slot === 'A' || slot === 'B' || slot === 'C' || slot === 'D' ? slot : 'SIMULTANEOUS';
+  };
   const handleEditMessage = async (id: string, newText: string) => {
-    const targetIdx = currentMessages.findIndex((m) => m.id === id);
-    if (targetIdx === -1) return;
-
-    const targetMsg = currentMessages[targetIdx];
-
-    if (targetMsg.role === 'assistant') {
-      // Direct edit of DM message
-      const updated = currentMessages.map((m) =>
-        m.id === id ? { ...m, content: newText } : m
-      );
-      setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: updated }));
-    } else {
-      // User message edit: truncate subsequent responses and regenerate!
-      const truncated = currentMessages.slice(0, targetIdx);
-      const editedUserMsg: ChatMessage = { ...targetMsg, content: newText };
-      const updatedHistory = [...truncated, editedUserMsg];
-
-      setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: updatedHistory }));
-      setIsLoading(true);
-
-      try {
-        const response = await generateDmTurn(
-          currentCampaign,
-          currentCharacters,
-          currentLore,
-          updatedHistory,
-          settings,
-          newText
-        );
-
-        const dmMsg: ChatMessage = {
-          id: `msg-dm-${Date.now()}`,
-          campaignId: activeCampaignId,
-          role: 'assistant',
-          speakerName: 'Dungeon Master',
-          speakerPlayerSlot: 'DM',
-          dmMood: currentCampaign.dmMood,
-          content: response.cleanContent,
-          reasoning: response.reasoning,
-          requestedCheck: response.requestedCheck,
-          timestamp: Date.now(),
-        };
-
-        setMessagesMap((prev) => ({
-          ...prev,
-          [activeCampaignId]: [...updatedHistory, dmMsg],
-        }));
-
-        if (response.requestedCheck) {
-          setActiveCheck(response.requestedCheck);
-          setIsDiceOpen(true);
-        }
-      } finally {
-        setIsLoading(false);
-      }
+    if (turnInFlight.current || pendingActionCheck || !newText.trim()) return;
+    const index = currentMessages.findIndex((m) => m.id === id);
+    if (index < 0) return;
+    const target = currentMessages[index];
+    if (target.role === 'assistant') {
+      setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: (prev[activeCampaignId] || []).map((m) => m.id === id ? { ...m, content: newText } : m) }));
+      return;
     }
+    await requestTurn([...currentMessages.slice(0, index), { ...target, content: newText.trim() }], messageSlot(target), false);
   };
-
-  // Delete message
   const handleDeleteMessage = (id: string) => {
-    const updated = currentMessages.filter((m) => m.id !== id);
-    setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: updated }));
+    if (turnInFlight.current || pendingActionCheck) return;
+    setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: (prev[activeCampaignId] || []).filter((m) => m.id !== id) }));
   };
-
-  // Regenerate last DM message
   const handleRegenerateMessage = async (id: string) => {
-    const targetIdx = currentMessages.findIndex((m) => m.id === id);
-    if (targetIdx <= 0) return;
-
-    // Previous message should be user action
-    const previousHistory = currentMessages.slice(0, targetIdx);
-    const lastUserMsg = previousHistory[previousHistory.length - 1];
-
-    setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: previousHistory }));
-    setIsLoading(true);
-
-    try {
-      const response = await generateDmTurn(
-        currentCampaign,
-        currentCharacters,
-        currentLore,
-        previousHistory,
-        settings,
-        lastUserMsg.content
-      );
-
-      const dmMsg: ChatMessage = {
-        id: `msg-dm-${Date.now()}`,
-        campaignId: activeCampaignId,
-        role: 'assistant',
-        speakerName: 'Dungeon Master',
-        speakerPlayerSlot: 'DM',
-        dmMood: currentCampaign.dmMood,
-        content: response.cleanContent,
-        reasoning: response.reasoning,
-        requestedCheck: response.requestedCheck,
-        timestamp: Date.now(),
-      };
-
-      setMessagesMap((prev) => ({
-        ...prev,
-        [activeCampaignId]: [...previousHistory, dmMsg],
-      }));
-
-      if (response.requestedCheck) {
-        setActiveCheck(response.requestedCheck);
-        setIsDiceOpen(true);
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    if (turnInFlight.current || pendingActionCheck) return;
+    const index = currentMessages.findIndex((m) => m.id === id);
+    if (index <= 0 || currentMessages[index].role !== 'assistant') return;
+    const history = currentMessages.slice(0, index);
+    const lastUser = history[history.length - 1];
+    if (lastUser?.role !== 'user') return;
+    await requestTurn(history, messageSlot(lastUser), false);
   };
-
-  // Manual or automatic compression
   const handleManualSummarize = () => {
-    if (currentMessages.length <= 2) return;
-
-    // Compress older messages into history chronicles
-    const messagesToCompress = currentMessages.slice(1, -2);
-    if (messagesToCompress.length === 0) return;
-
-    const summaryText = messagesToCompress
-      .map((m) => `${m.speakerName}: ${m.content.slice(0, 100)}...`)
-      .join('; ');
-
-    const newChronicle: CampaignHistoryEntry = {
-      id: `hist-${Date.now()}`,
-      title: `Эпизод: ${currentCampaign.currentLocation}`,
-      summary: `Ключевые события: ${summaryText}`,
-      timestamp: Date.now(),
-      keyEvents: ['Продвижение отряда', 'Разрешение проверок'],
-      charactersInvolved: characters.map((c) => c.name),
+    if (turnInFlight.current || pendingActionCheck || currentMessages.length <= 2) return;
+    const older = currentMessages.slice(1, -2);
+    if (!older.length) return;
+    const chronicle: CampaignHistoryEntry = {
+      id: `hist-${crypto.randomUUID()}`, title: `Эпизод: ${currentCampaign.currentLocation}`,
+      summary: `Ключевые события: ${older.map((m) => `${m.speakerName}: ${m.content.slice(0, 100)}...`).join('; ')}`,
+      timestamp: Date.now(), keyEvents: ['Продвижение отряда', 'Разрешение проверок'], charactersInvolved: currentCharacters.map((c) => c.name),
     };
-
-    const remainingMessages = [currentMessages[0], ...currentMessages.slice(-2)];
-
-    setCampaigns((prev) =>
-      prev.map((c) =>
-        c.id === activeCampaignId
-          ? { ...c, historyChronicles: [...c.historyChronicles, newChronicle] }
-          : c
-      )
-    );
-
-    setMessagesMap((prev) => ({
-      ...prev,
-      [activeCampaignId]: remainingMessages,
-    }));
+    setCampaigns((prev) => prev.map((c) => c.id === activeCampaignId ? { ...c, historyChronicles: [...(c.historyChronicles || []), chronicle] } : c));
+    setMessagesMap((prev) => ({ ...prev, [activeCampaignId]: [currentMessages[0], ...currentMessages.slice(-2)] }));
   };
-
-  // Export Campaign JSON
   const handleExportCampaign = () => {
-    const backupData = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      campaign: currentCampaign,
-      characters,
-      lore: currentLore,
-      messages: currentMessages,
-      settings,
-    };
-
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `mythictavern_${currentCampaign.title.replace(/\s+/g, '_')}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+    const data = { version: '1.0', exportedAt: new Date().toISOString(), campaign: currentCampaign, characters, lore: currentLore, messages: currentMessages, settings };
+    const anchor = document.createElement('a');
+    anchor.href = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+    anchor.download = `mythictavern_${currentCampaign.title.replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   };
-
-  // Import Campaign JSON
   const handleImportCampaign = (jsonString: string) => {
+    if (turnInFlight.current) return;
     try {
       const data = JSON.parse(jsonString);
       if (data.campaign) {
@@ -588,164 +258,51 @@ export default function App() {
       }
       if (data.characters) setCharacters(data.characters);
       if (data.lore) setLoreEntities((prev) => [...data.lore, ...prev]);
-      if (data.messages && data.campaign?.id) {
-        setMessagesMap((prev) => ({ ...prev, [data.campaign.id]: data.messages }));
-      }
+      if (data.messages && data.campaign?.id) setMessagesMap((prev) => ({ ...prev, [data.campaign.id]: data.messages }));
       if (data.settings) setSettings(data.settings);
-    } catch (e) {
-      console.error('Failed to import campaign:', e);
-    }
+    } catch (error) { console.error('Failed to import campaign:', error); }
   };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-950 font-sans text-stone-100">
-      {/* Top Bar Navigation */}
-      <Header
-        campaign={currentCampaign}
-        settings={settings}
-        onOpenCampaigns={() => setIsCampaignManagerOpen(true)}
-        onOpenDice={() => {
-          setActiveCheck(null);
-          setIsDiceOpen(true);
-        }}
-        onOpenCharacters={() => setIsCharSheetOpen(true)}
-        onOpenLorebook={() => setIsLorebookOpen(true)}
-        onOpenContext={() => setIsContextOpen(true)}
-        onOpenNotebook={() => setIsNotebookOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onChangeDmMood={handleChangeDmMood}
-      />
-
-      {/* Main Workspace Split */}
+      <Header campaign={currentCampaign} settings={settings} onOpenCampaigns={() => setIsCampaignManagerOpen(true)}
+        onOpenDice={() => { if (!turnInFlight.current) { setActiveCheck(null); setIsDiceOpen(true); } }}
+        onOpenCharacters={() => setIsCharSheetOpen(true)} onOpenLorebook={() => setIsLorebookOpen(true)}
+        onOpenContext={() => setIsContextOpen(true)} onOpenNotebook={() => setIsNotebookOpen(true)} onOpenSettings={() => setIsSettingsOpen(true)} onChangeDmMood={handleChangeDmMood} />
+      {turnError && <div role="alert" className="px-4 py-2 bg-rose-950 text-rose-200 text-sm">{turnError}</div>}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Party & Adventure Sidebar */}
-        <PartySidebar
-          campaigns={campaigns}
-          activeCampaignId={activeCampaignId}
-          characters={currentCharacters}
-          activeSlot={activeSlot}
-          activeLocation={currentCampaign.currentLocation}
-          loreEntities={currentLore}
-          onSelectCampaign={(id) => setActiveCampaignId(id)}
-          onSelectSlot={(slot) => setActiveSlot(slot)}
-          onOpenCampaigns={() => setIsCampaignManagerOpen(true)}
-          onOpenCharacters={() => setIsCharSheetOpen(true)}
-          onOpenDice={() => {
-            setActiveCheck(null);
-            setIsDiceOpen(true);
-          }}
-          onOpenLorebook={() => setIsLorebookOpen(true)}
-          onChangeDmMood={handleChangeDmMood}
-        />
-
-        {/* Central Narrative Chat Timeline */}
-        <ChatArea
-          messages={currentMessages}
-          characters={currentCharacters}
-          activeSlot={activeSlot}
-          onSelectSlot={(slot) => setActiveSlot(slot)}
-          isLoading={isLoading}
-          onSendMessage={handleSendMessage}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onRegenerateMessage={handleRegenerateMessage}
-          onRequestCheckRoll={handleTriggerSkillRoll}
-          pendingActionCheck={pendingActionCheck}
-          onRollPendingCheck={handleRollPendingCheck}
-          onSkipPendingCheck={handleSkipPendingCheck}
-          onCancelPendingCheck={handleCancelPendingCheck}
-        />
+        <PartySidebar campaigns={campaigns} activeCampaignId={activeCampaignId} characters={currentCharacters} activeSlot={activeSlot}
+          activeLocation={currentCampaign.currentLocation} loreEntities={currentLore} onSelectCampaign={setActiveCampaignId} onSelectSlot={setActiveSlot}
+          onOpenCampaigns={() => setIsCampaignManagerOpen(true)} onOpenCharacters={() => setIsCharSheetOpen(true)}
+          onOpenDice={() => { if (!turnInFlight.current) { setActiveCheck(null); setIsDiceOpen(true); } }}
+          onOpenLorebook={() => setIsLorebookOpen(true)} onChangeDmMood={handleChangeDmMood} />
+        <ChatArea messages={currentMessages} characters={currentCharacters} activeSlot={activeSlot} onSelectSlot={setActiveSlot}
+          isLoading={isLoading} onSendMessage={handleSendMessage} onEditMessage={handleEditMessage} onDeleteMessage={handleDeleteMessage}
+          onRegenerateMessage={handleRegenerateMessage} onRequestCheckRoll={handleTriggerSkillRoll} pendingActionCheck={pendingActionCheck}
+          onRollPendingCheck={handleRollPendingCheck} onSkipPendingCheck={handleSkipPendingCheck} onCancelPendingCheck={() => setPendingActionCheck(null)} />
       </div>
-
-      {/* Interactive Modals */}
-      <CampaignManagerModal
-        isOpen={isCampaignManagerOpen}
-        onClose={() => setIsCampaignManagerOpen(false)}
-        campaigns={campaigns}
-        activeCampaignId={activeCampaignId}
-        onSelectCampaign={(id) => setActiveCampaignId(id)}
-        onCreateCampaign={handleCreateCampaign}
-        onUpdateCampaign={(updated) =>
-          setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
-        }
-        onDeleteCampaign={handleDeleteCampaign}
-      />
-
-      <DiceModal
-        isOpen={isDiceOpen}
-        onClose={() => {
-          setIsDiceOpen(false);
-          setActiveCheck(null);
-        }}
-        activeCheck={activeCheck}
-        activeCharacter={activeChar}
-        onApplyResult={handleApplyDiceResult}
-      />
-
-      <CharacterSheetModal
-        isOpen={isCharSheetOpen}
-        onClose={() => setIsCharSheetOpen(false)}
-        characters={currentCharacters}
-        activeSlot={activeSlot === 'SIMULTANEOUS' ? 'A' : (activeSlot as 'A' | 'B' | 'C' | 'D')}
+      <CampaignManagerModal isOpen={isCampaignManagerOpen} onClose={() => setIsCampaignManagerOpen(false)} campaigns={campaigns}
+        activeCampaignId={activeCampaignId} onSelectCampaign={setActiveCampaignId} onCreateCampaign={handleCreateCampaign}
+        onUpdateCampaign={(updated) => setCampaigns((prev) => prev.map((c) => c.id === updated.id ? updated : c))} onDeleteCampaign={handleDeleteCampaign} />
+      <DiceModal isOpen={isDiceOpen} onClose={() => { setIsDiceOpen(false); setActiveCheck(null); }}
+        activeCheck={activeCheck} activeCharacter={activeChar} onApplyResult={handleApplyDiceResult} />
+      <CharacterSheetModal isOpen={isCharSheetOpen} onClose={() => setIsCharSheetOpen(false)} characters={currentCharacters}
+        activeSlot={activeSlot === 'SIMULTANEOUS' ? 'A' : activeSlot}
         onSelectSlot={(slot) => setActiveSlot(slot as 'A' | 'B' | 'SIMULTANEOUS')}
-        onUpdateCharacter={(updated) =>
-          setCharacters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
-        }
-        onCreateCharacter={handleCreateCharacter}
-        onDeleteCharacter={handleDeleteCharacter}
-        onRollSkill={handleTriggerSkillRoll}
-      />
-
-      <LorebookModal
-        isOpen={isLorebookOpen}
-        onClose={() => setIsLorebookOpen(false)}
-        campaignId={activeCampaignId}
-        entities={currentLore}
-        onUpdateEntity={(updated) =>
-          setLoreEntities((prev) => prev.map((e) => (e.id === updated.id ? updated : e)))
-        }
-        onAddEntity={(created) => setLoreEntities((prev) => [created, ...prev])}
-        onDeleteEntity={(id) => setLoreEntities((prev) => prev.filter((e) => e.id !== id))}
-      />
-
-      <ContextInspectorModal
-        isOpen={isContextOpen}
-        onClose={() => setIsContextOpen(false)}
-        campaign={currentCampaign}
-        contextBreakdown={contextBreakdown}
-        onUpdatePinnedFacts={(facts) =>
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === activeCampaignId ? { ...c, pinnedFacts: facts } : c))
-          )
-        }
-      />
-
-      <SummaryNotebookModal
-        isOpen={isNotebookOpen}
-        onClose={() => setIsNotebookOpen(false)}
-        campaign={currentCampaign}
-        settings={settings}
-        onUpdateChronicles={(chronicles) =>
-          setCampaigns((prev) =>
-            prev.map((c) => (c.id === activeCampaignId ? { ...c, historyChronicles: chronicles } : c))
-          )
-        }
-        onUpdateSettings={setSettings}
-        onTriggerManualSummarize={handleManualSummarize}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        campaign={currentCampaign}
-        onUpdateSettings={setSettings}
-        onUpdateCampaign={(updated) =>
-          setCampaigns((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
-        }
-        onExportCampaign={handleExportCampaign}
-        onImportCampaign={handleImportCampaign}
-      />
+        onUpdateCharacter={(updated) => setCharacters((prev) => prev.map((c) => c.id === updated.id ? updated : c))}
+        onCreateCharacter={(created) => setCharacters((prev) => [...prev, { ...created, campaignId: activeCampaignId }])}
+        onDeleteCharacter={(id) => setCharacters((prev) => prev.filter((c) => c.id !== id))} onRollSkill={handleTriggerSkillRoll} />
+      <LorebookModal isOpen={isLorebookOpen} onClose={() => setIsLorebookOpen(false)} campaignId={activeCampaignId} entities={currentLore}
+        onUpdateEntity={(updated) => setLoreEntities((prev) => prev.map((e) => e.id === updated.id ? updated : e))}
+        onAddEntity={(created) => setLoreEntities((prev) => [created, ...prev])} onDeleteEntity={(id) => setLoreEntities((prev) => prev.filter((e) => e.id !== id))} />
+      <ContextInspectorModal isOpen={isContextOpen} onClose={() => setIsContextOpen(false)} campaign={currentCampaign} contextBreakdown={contextBreakdown}
+        onUpdatePinnedFacts={(facts) => setCampaigns((prev) => prev.map((c) => c.id === activeCampaignId ? { ...c, pinnedFacts: facts } : c))} />
+      <SummaryNotebookModal isOpen={isNotebookOpen} onClose={() => setIsNotebookOpen(false)} campaign={currentCampaign} settings={settings}
+        onUpdateChronicles={(chronicles) => setCampaigns((prev) => prev.map((c) => c.id === activeCampaignId ? { ...c, historyChronicles: chronicles } : c))}
+        onUpdateSettings={setSettings} onTriggerManualSummarize={handleManualSummarize} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} campaign={currentCampaign}
+        onUpdateSettings={setSettings} onUpdateCampaign={(updated) => setCampaigns((prev) => prev.map((c) => c.id === updated.id ? updated : c))}
+        onExportCampaign={handleExportCampaign} onImportCampaign={handleImportCampaign} />
     </div>
   );
 }
