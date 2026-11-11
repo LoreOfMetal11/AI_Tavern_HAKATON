@@ -1,0 +1,6 @@
+{
+  "name": "MythicTavern - D&D AI Master Studio",
+  "description": "Продвинутое пространство для настольных ролевых игр формата D&D 5e с поддержкой локальных и облачных нейросетей, менеджером лора, кубиками и контекстным движком.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
